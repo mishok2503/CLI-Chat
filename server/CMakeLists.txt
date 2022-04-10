@@ -1,5 +1,4 @@
 set(SOURCES
-    src/test.cpp
     src/main.cpp
 )
 
