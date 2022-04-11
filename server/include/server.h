@@ -5,13 +5,13 @@
 
 #include <string>
 #include <iostream>
+#include <fstream>
 #include <map>
 #include <sstream>
 #include <vector>
 
 #include "user.h"
 
-//TODO: shut down
 class Server {
 public:
     using server = websocketpp::server<websocketpp::config::asio>;
@@ -24,6 +24,8 @@ private:
     server endpoint;
 
     std::map<handle, User, std::owner_less<handle>> users;
+    std::string path;
+    std::fstream users_file;
 
     void on_message(handle hdl, server::message_ptr msg);
     void on_open(handle hdl);
@@ -33,7 +35,7 @@ private:
 
 public:
 
-    Server(uint16_t port);
+    Server(uint16_t port, std::string path = "data");
 
     void print_status(std::ostream& os);
 };

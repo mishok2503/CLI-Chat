@@ -5,10 +5,20 @@
 #include <sstream>
 #include <chrono>
 #include <thread>
+#include <filesystem>
 
 #include "user.h"
 
-Server::Server(uint16_t port) {
+Server::Server(uint16_t port, std::string path) : path(std::move(path)) {
+    this->path += '/';
+
+    std::filesystem::create_directory(this->path);
+    users_file.open(this->path + "users.txt", std::ios::in | std::ios::out | std::ios::app);
+    if (!users_file.is_open()) {
+        std::cerr << "Can't open files by parh: " << this->path << std::endl;
+        std::abort();
+    }
+
     endpoint.set_error_channels(websocketpp::log::elevel::all);
     endpoint.set_access_channels(websocketpp::log::alevel::all ^ websocketpp::log::alevel::frame_payload);
 
@@ -96,9 +106,19 @@ std::string Server::sign(User& usr, std::istream& is, bool sign_up) {
             return "response fail username or password is incorrect";
         }
     } else {
-        //TODO: check that user don't exists
-        usr.nick = nick;
-        usr.password_hash = p_hash;
+        users_file.seekg(0);
+        bool exists = false;
+        for (std::string line; !exists && (users_file >> line); ) {
+            exists = line == nick;
+            std::cerr << line << '\n';
+        }
+        if (exists) {
+            return "response fail user already exists";
+        }
+        usr.nick = std::move(nick);
+        usr.password_hash = std::move(p_hash);
+        users_file.seekp(0,  std::ios_base::end);
+        users_file << usr.nick << std::endl;
     }
     usr.status = User::Status::SIGNED;
     return "response success";
