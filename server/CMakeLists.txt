@@ -1,5 +1,7 @@
 set(SOURCES
     src/main.cpp
+    src/server.cpp
+    src/connection_data.cpp
 )
 
 add_executable(server ${SOURCES})
