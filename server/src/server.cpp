@@ -1,107 +1,105 @@
-#include "client.h"
+#include "server.h"
 
 #include <string>
 #include <iostream>
+#include <sstream>
 #include <chrono>
 #include <thread>
 
-#include "connection_data.h"
+#include "user.h"
 
-Client::Client(const std::string& uri) {
-    endpoint.clear_access_channels(websocketpp::log::alevel::all);
-    endpoint.clear_error_channels(websocketpp::log::elevel::all);
+Server::Server(uint16_t port) {
+    endpoint.set_error_channels(websocketpp::log::elevel::all);
+    endpoint.set_access_channels(websocketpp::log::alevel::all ^ websocketpp::log::alevel::frame_payload);
 
     endpoint.init_asio();
-    endpoint.start_perpetual();
 
-    thread.reset(new websocketpp::lib::thread(&client::run, &endpoint));
-
-    is_conn = connect(uri);
-}
-
-bool Client::connect(const std::string& uri) {
-    websocketpp::lib::error_code ec;
-    const auto& con = endpoint.get_connection(uri, ec);
-
-    if (ec) {
-        std::cerr << "> Connect initialization error: " << ec.message() << std::endl;
-        return false;
-    }
-
-    connection_data = websocketpp::lib::make_shared<ConnectionData>(con->get_handle(), uri);
-
-    con->set_open_handler(websocketpp::lib::bind(
-        &ConnectionData::on_open,
-        connection_data,
-        &endpoint,
+    endpoint.set_open_handler(websocketpp::lib::bind(
+        &Server::on_open,
+        this,
         websocketpp::lib::placeholders::_1
     ));
-    con->set_fail_handler(websocketpp::lib::bind(
-        &ConnectionData::on_fail,
-        connection_data,
-        &endpoint,
+
+    endpoint.set_close_handler(websocketpp::lib::bind(
+        &Server::on_close,
+        this,
         websocketpp::lib::placeholders::_1
     ));
-    con->set_close_handler(websocketpp::lib::bind(
-        &ConnectionData::on_close,
-        connection_data,
-        &endpoint,
-        websocketpp::lib::placeholders::_1
-    ));
-    con->set_message_handler(websocketpp::lib::bind(
-        &ConnectionData::on_message,
-        connection_data,
+
+    endpoint.set_message_handler(websocketpp::lib::bind(
+        &Server::on_message,
+        this,
         websocketpp::lib::placeholders::_1,
         websocketpp::lib::placeholders::_2
     ));
 
-    endpoint.connect(con);
+    endpoint.listen(port);
+    endpoint.start_accept();
+    endpoint.run();
+}
 
-    std::cerr << "> Waitng connection" << std::endl;
-    for (int i=0; connection_data->is_connecting(); ++i) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        if (i == 20) {
-            std::cerr << "> Time out" << std::endl;
-            return false; 
+
+void Server::on_message(handle hdl, server::message_ptr msg) {
+    const auto& txt = websocketpp::frame::opcode::text;
+    if (msg->get_opcode() != txt) {
+        endpoint.send(hdl, "erorr received a non-text message", txt);
+        return;
+    }
+
+    std::stringstream ss(msg->get_payload());
+    std::string cmd;
+    ss >> cmd;
+
+    auto send = [&](auto str) {
+        endpoint.send(hdl, str, txt);
+    };
+
+    if (cmd == "sign-up") {
+        send(sign(users[hdl], ss, true));
+        return;
+    }
+    if (cmd == "sign-in") {
+        send(sign(users[hdl], ss, false));
+        return;
+    }
+    endpoint.send(hdl, "erorr unsupported command was received", txt);
+}
+
+
+void Server::on_open(handle hdl) {
+    users[hdl] = User{"", {}, User::Status::CONNECTED};
+}
+
+
+void Server::on_close(handle hdl) {
+    users.erase(hdl);
+}
+
+std::vector<size_t> Server::get_hash(std::string str) {
+    std::vector<size_t> res;
+    constexpr int block_size = 3;
+    for (size_t i=0; i < str.size(); i += block_size) {
+        res.push_back(std::hash<std::string>{}(str.substr(i, std::max(str.size(), i + block_size))));
+    }
+    return res;
+}
+
+std::string Server::sign(User& usr, std::istream& is, bool sign_up) {
+    if (usr.status != User::Status::CONNECTED) {
+        return "error invalid user status";
+    }
+    std::string nick, pswd;
+    is >> nick >> pswd;
+    auto p_hash = get_hash(std::move(pswd));
+    if (!sign_up) {
+        if (usr.nick != nick || usr.password_hash != p_hash) {
+            return "response fail username or password is incorrect";
         }
-    }
-    std::cerr << "> Conncted" << std::endl;
-    return true;
-}
-
-void Client::send(const std::string& message) {
-    websocketpp::lib::error_code ec;
-    endpoint.send(connection_data->get_hdl(), message, websocketpp::frame::opcode::text, ec);
-    if (ec) {
-        std::cout << "> Error sending message: " << ec.message() << std::endl;
-    }
-}
-
-void Client::close(websocketpp::close::status::value code) {
-    websocketpp::lib::error_code ec;
-    
-    endpoint.close(connection_data->get_hdl(), code, "", ec);
-    if (ec) {
-        std::cerr << "> Error initiating close: " << ec.message() << std::endl;
     } else {
-        std::cerr << "> Connection closed" << std::endl;
+        //TODO: check that user don't exists
+        usr.nick = nick;
+        usr.password_hash = p_hash;
     }
-}
-
-void Client::print_status(std::ostream& os) {
-    if (connection_data) {
-        os << *connection_data << std::endl;
-    } else {
-        os << "> No connection" << std::endl;
-    }
-}
-
-bool Client::is_connected() const {
-    return is_conn;
-}
-
-Client::~Client() {
-    endpoint.stop_perpetual();
-    close(websocketpp::close::status::going_away);
-    thread->join();
+    usr.status = User::Status::SIGNED;
+    return "response success";
 }

@@ -51,6 +51,10 @@ bool ConnectionData::is_connecting() const {
     return status == ST_CONN;
 }
 
+const std::string& ConnectionData::get_status() const {
+    return status;
+}
+
 std::ostream& operator<< (std::ostream& os, const ConnectionData& data) {
     os << "> URI: " << data.uri << "\n"
         << "> Status: " << data.status << "\n"

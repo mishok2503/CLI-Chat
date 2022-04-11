@@ -24,6 +24,7 @@ public:
  
     websocketpp::connection_hdl get_hdl() const;
     bool is_connecting() const;
+    const std::string& get_status() const;
 
     friend std::ostream& operator<< (std::ostream& out, const ConnectionData& data);
 private:

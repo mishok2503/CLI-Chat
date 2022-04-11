@@ -1,10 +1,11 @@
 #include <iostream>
 
+#include "server.h"
+
 int main() {
 
 
-    std::cout << "This is server\n";
-
+    Server s(8239);
 
     return 0;
 }

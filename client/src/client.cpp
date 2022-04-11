@@ -65,6 +65,11 @@ bool Client::connect(const std::string& uri) {
             return false; 
         }
     }
+    if (connection_data->get_status() == ConnectionData::ST_FAIL) {
+        std::cerr << "> Connection fail\n";
+        print_status(std::cerr);
+        return false;
+    }
     std::cerr << "> Conncted" << std::endl;
     return true;
 }
@@ -78,6 +83,10 @@ void Client::send(const std::string& message) {
 }
 
 void Client::close(websocketpp::close::status::value code) {
+    if (!is_connected()) {
+        return;
+    }
+
     websocketpp::lib::error_code ec;
     
     endpoint.close(connection_data->get_hdl(), code, "", ec);

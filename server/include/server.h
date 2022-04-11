@@ -1,36 +1,39 @@
 #pragma once
 
-#include <websocketpp/config/asio_no_tls_client.hpp>
-#include <websocketpp/client.hpp>
+#include <websocketpp/config/asio_no_tls.hpp>
+#include <websocketpp/server.hpp>
 
 #include <string>
 #include <iostream>
+#include <map>
+#include <sstream>
+#include <vector>
 
-class ConnectionData;
+#include "user.h"
 
-class Client {
+//TODO: shut down
+class Server {
 public:
-    using client = websocketpp::client<websocketpp::config::asio_client>;
+    using server = websocketpp::server<websocketpp::config::asio>;
 
 private:
+    using handle = websocketpp::connection_hdl;
 
-    client endpoint;
-    websocketpp::lib::shared_ptr<websocketpp::lib::thread> thread;
-    websocketpp::lib::shared_ptr<ConnectionData> connection_data;
+    static std::vector<size_t> get_hash(std::string str);
 
-    bool is_conn;
+    server endpoint;
 
-    bool connect(const std::string& uri);
-    void close(websocketpp::close::status::value code);
+    std::map<handle, User, std::owner_less<handle>> users;
+
+    void on_message(handle hdl, server::message_ptr msg);
+    void on_open(handle hdl);
+    void on_close(handle hdl);
+
+    std::string sign(User& usr, std::istream& is, bool sign_up);
 
 public:
 
-    Client(const std::string& uri);
-
-    void send(const std::string& message);
+    Server(uint16_t port);
 
     void print_status(std::ostream& os);
-    bool is_connected() const;
-
-    ~Client();
 };
