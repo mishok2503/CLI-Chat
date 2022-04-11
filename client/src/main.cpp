@@ -3,14 +3,17 @@
 #include "client.h"
 
 int main() {
-    std::cerr << "Start\n";
-
     Client c("ws://localhost:9002");
     //Client c("asd");
     //Client c("ws://echo.websocket.events");
-sleep(1);
-c.print_status(std::cout);
+    //c.print_status(std::cout);
+//
+//    if (!c.is_connected()) {
+//        return 1;
+//    }
 
-    std::cerr << "End\n";
+    c.send("ASD");
+    int a;
+std::cin >> a;
     return 0;
 }

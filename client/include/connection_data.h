@@ -20,6 +20,7 @@ public:
     void on_open(Client::client* client, websocketpp::connection_hdl hdl);
     void on_fail(Client::client* client, websocketpp::connection_hdl hdl);
     void on_close(Client::client* client, websocketpp::connection_hdl hdl);
+    void on_message(websocketpp::connection_hdl, Client::client::message_ptr msg);
  
     websocketpp::connection_hdl get_hdl() const;
     bool is_connecting() const;

@@ -35,6 +35,14 @@ void ConnectionData::on_close(Client::client* client, websocketpp::connection_hd
     error_reason = ss.str();
 }
 
+void ConnectionData::on_message(websocketpp::connection_hdl, Client::client::message_ptr msg) {
+    if (msg->get_opcode() == websocketpp::frame::opcode::text) {
+        std::cout << "< " << msg->get_payload() << std::endl;
+    } else {
+        std::cerr << "> Get non text message";
+    }
+}
+
 websocketpp::connection_hdl ConnectionData::get_hdl() const {
     return hdl;
 }
